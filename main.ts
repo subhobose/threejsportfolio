@@ -24,6 +24,19 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enablePan = false;
 
+{
+  const loader = new THREE.CubeTextureLoader();
+  const texture = loader.load([
+    "textures/arid_ft.jpg",
+    "textures/arid_bk.jpg",
+    "textures/arid_up.jpg",
+    "textures/arid_dn.jpg",
+    "textures/arid_rt.jpg",
+    "textures/arid_lf.jpg",
+  ]);
+  scene.background = texture;
+}
+
 // Load the aircraft model
 const loader = new GLTFLoader();
 let airplane: THREE.Object3D | undefined;
@@ -66,7 +79,6 @@ window.addEventListener("resize", () => {
 });
 
 // Flight controls
-const flightSpeed = 0.5;
 
 const rotationSpeed = 0.01;
 let targetRotation = 0;
@@ -75,27 +87,35 @@ const translationSmoothness = 0.1;
 
 let targetPosition = new THREE.Vector3();
 
+// Boolean flags to control acceleration and deceleration
+let accelerate = false;
+let decelerate = false;
+
+// Aircraft speed and acceleration variables
+let currentSpeed = 0.05;
+const acceleration = 0.01;
+const deceleration = 0.01;
+const maxSpeed = 0.3;
+const minSpeed = 0.05;
+
 document.addEventListener("keydown", (event) => {
   switch (event.key) {
     case "w":
-      if (airplane) {
-        const forward = new THREE.Vector3(0, 0, 1);
-        forward.applyQuaternion(airplane.quaternion);
-        targetPosition.addVectors(
-          airplane.position,
-          forward.multiplyScalar(flightSpeed)
-        );
-      }
+      accelerate = true;
       break;
     case "s":
-      if (airplane) {
-        const backward = new THREE.Vector3(0, 0, -1);
-        backward.applyQuaternion(airplane.quaternion);
-        targetPosition.addVectors(
-          airplane.position,
-          backward.multiplyScalar(flightSpeed)
-        );
-      }
+      decelerate = true;
+      break;
+  }
+});
+
+document.addEventListener("keyup", (event) => {
+  switch (event.key) {
+    case "w":
+      accelerate = false;
+      break;
+    case "s":
+      decelerate = false;
       break;
   }
 });
@@ -116,6 +136,22 @@ function animate() {
   if (airplane) {
     airplane.rotation.y += (targetRotation - airplane.rotation.y) * 0.05;
     airplane.rotation.x += (targetPitch - airplane.rotation.x) * 0.05;
+
+    // Accelerate
+    if (accelerate && currentSpeed < maxSpeed) {
+      currentSpeed += acceleration;
+    }
+
+    // Decelerate
+    if (decelerate && currentSpeed > minSpeed) {
+      currentSpeed -= deceleration;
+    }
+    const forward = new THREE.Vector3(0, 0, 1);
+    forward.applyQuaternion(airplane.quaternion);
+    targetPosition.addVectors(
+      airplane.position,
+      forward.multiplyScalar(currentSpeed)
+    );
 
     airplane.position.lerp(targetPosition, translationSmoothness);
 
